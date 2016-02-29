@@ -1,0 +1,111 @@
+<?xml version="1.0"?>
+<project>
+  <property name="rootpath" value="."/>
+  <property name="rootdir" location="${rootpath}"/>
+  <property name="level" value="ADVANCED_OPTIMIZATIONS"/>
+  <property name="src" value="${rootpath}/src"/>
+  <property name="compiler" value="${rootpath}/bower_components/closure-compiler/lib/vendor/compiler.jar"/>
+  <property name="closure_src"
+            value="${rootpath}/bower_components/google-closure-library/closure/goog"/>
+  <property name="closure_tp_src"
+            value="${rootpath}/bower_components/google-closure-library/third_party/closure/goog"/>
+  <property name="depswriter"
+            value="${rootpath}/bower_components/google-closure-library/closure/bin/build/depswriter.py"/>
+  <property name="closurebuilder"
+            value="${rootpath}/bower_components/google-closure-library/closure/bin/build/closurebuilder.py"/>
+  <property name="depend" value="deps.js" />
+  <property name="export" value="${rootpath}/export"/>
+  <property name="externs" value="${rootpath}/externs"/>
+
+  <property name="compiled" value="hapmap.js"/>
+  <property name="compiledmin" value="hapmap.min.js"/>
+
+  <loadfile property="license" srcfile="LICENSE"/>
+
+  <target name="deps" description="">
+    <exec executable="python" failonerror="true">
+      <arg line="${depswriter}"/>
+      <arg line="--root_with_prefix=&quot;${src}/hapmap ../../../../src/hapmap&quot;"/>
+      <arg line="--output_file=${depend}"/>
+    </exec>
+
+    <pathconvert property="exportfiles" pathsep=" ">
+      <map from="${rootdir}" to="&#45;&#45;js ."/>
+      <fileset dir="${export}" includes="**/*.js"/>
+    </pathconvert>
+
+    <exec executable="python" failonerror="true">
+      <arg line="${closurebuilder}"/>
+      <arg line="--root=&quot;${closure_src}&quot;"/>
+      <arg line="--root=&quot;${closure_tp_src}&quot;"/>
+      <arg line="--root=&quot;${src}/hapmap&quot;"/>
+      <arg line="--namespace=&quot;hapmap&quot;"/>
+      <redirector outputproperty="srcfiles" errorproperty="depserr">
+        <outputfilterchain>
+          <replacestring from="\" to="/"/>
+          <prefixlines prefix=" --js ./" />
+          <striplinebreaks />
+          <trim />
+        </outputfilterchain>
+      </redirector>
+    </exec>
+
+  </target>
+
+  <target name="concat" description="">
+    <exec executable="python" failonerror="true">
+      <arg line="${closurebuilder}"/>
+      <arg line="--root=&quot;${closure_src}&quot;"/>
+      <arg line="--root=&quot;${closure_tp_src}&quot;"/>
+      <arg line="--root=&quot;${src}/hapmap&quot;"/>
+      <arg line="--namespace=&quot;hapmap&quot;"/>
+      <redirector outputproperty="libfiles" errorproperty="depserr">
+        <outputfilterchain>
+          <linecontains negate="true">
+            <contains value="bower_components"/>
+          </linecontains>
+        </outputfilterchain>
+      </redirector>
+    </exec>
+
+    <echo message="${libfiles}"/>
+
+    <concat destfile="${compiled}" fixlastline="yes" eol="lf">
+      <header filtering="no" trimleading="yes">${license}</header>
+      <filelist files="${libfiles}"/>
+      <filterchain>
+        <replaceregex pattern="\/\*((?!\*\/).)+Created by((?!\*\/).)+\*\/" replace="" flags="gs" byline="false"/>
+      </filterchain>
+    </concat>
+  </target>
+
+  <target name="concat.externs" description="">
+    <concat destfile="${rootpath}/externs.js" fixlastline="yes" eol="lf">
+      <fileset dir="${externs}"/>
+      <filterchain>
+        <replaceregex pattern="\/\*((?!\*\/).)+Created by((?!\*\/).)+\*\/" replace="" flags="gs" byline="false"/>
+      </filterchain>
+    </concat>
+  </target>
+
+  <target name="compile" depends="deps,concat,concat.externs" description="">
+    <local name="outfile"/>
+    <property name="outfile" value="${compiledmin}"/>
+    <java jar="${compiler}" fork="true" failonerror="true">
+      <arg line="&#45;&#45;compilation_level=${level}"/>
+      <arg line="&#45;&#45;warning_level=VERBOSE"/>
+      <arg line="&#45;&#45;define=goog.DEBUG=false"/>
+      <arg line="&#45;&#45;summary_detail_level=3"/>
+      <arg line="&#45;&#45;language_in=ECMASCRIPT5_STRICT"/>
+      <arg line="&#45;&#45;source_map_format=V3"/>
+      <arg line="--output_wrapper='(function(){%output%}).call(this); //# sourceMappingURL=${compiledmin}.map'"/>
+      <arg line="&#45;&#45;js_output_file=${outfile}"/>
+      <arg line="&#45;&#45;create_source_map=${outfile}.map"/>
+      <arg line="&#45;&#45;manage_closure_dependencies"/>
+      <arg line="&#45;&#45;externs=${rootpath}/externs.js"/>
+      <arg line="&#45;&#45;js ${rootpath}/LICENSE"/>
+      <arg line="${srcfiles}"/>
+      <arg line="${exportfiles}"/>
+    </java>
+  </target>
+</project>
